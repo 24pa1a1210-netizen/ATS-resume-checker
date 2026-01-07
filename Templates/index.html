@@ -13,6 +13,15 @@
     
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+    <!-- PDF.js for PDF parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <!-- Mammoth.js for DOCX parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -144,7 +153,7 @@
                 <span class="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-secondary-500">Algorithm</span>
             </h1>
             <p class="text-lg md:text-xl text-gray-500 dark:text-gray-400 max-w-2xl mx-auto mb-8 font-light">
-                Modern Applicant Tracking Systems reject 75% of resumes. Check yours against the job description instantly with AI.
+                Modern Applicant Tracking Systems reject 75% of resumes. Upload your resume or paste text to check it against the job description instantly with AI.
             </p>
         </section>
 
@@ -152,19 +161,42 @@
         <section id="scanner" class="grid lg:grid-cols-2 gap-6 mb-8">
             
             <!-- Resume Input Panel -->
-            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-soft border border-gray-200 dark:border-gray-800 flex flex-col h-[500px] overflow-hidden transition-all focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500">
+            <div class="bg-white dark:bg-gray-900 rounded-xl shadow-soft border border-gray-200 dark:border-gray-800 flex flex-col h-[500px] overflow-hidden transition-all focus-within:ring-2 focus-within:ring-primary-500/20 focus-within:border-primary-500 relative">
+                
+                <!-- Overlay for Drag & Drop (Optional enhancement logic could go here, but keeping it simple) -->
+                
                 <div class="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-blue-500"></span>
                         <h2 class="font-heading font-semibold text-sm uppercase tracking-wider text-gray-500">Resume Content</h2>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span id="resumeWordCount" class="text-xs text-gray-400 font-mono">0 words</span>
-                        <button onclick="loadSample('resume')" class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400">Load Sample</button>
+                        <span id="resumeWordCount" class="text-xs text-gray-400 font-mono hidden sm:inline">0 words</span>
+                        
+                        <!-- File Upload Button -->
+                        <div class="relative group">
+                            <input type="file" id="resumeFileUpload" accept=".pdf,.docx,.txt" class="hidden" onchange="handleFileUpload(this)">
+                            <button onclick="document.getElementById('resumeFileUpload').click()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 text-xs font-medium hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+                            </button>
+                            <!-- Tooltip -->
+                            <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-max hidden group-hover:block bg-gray-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                Supports PDF, DOCX, TXT
+                            </div>
+                        </div>
+
+                        <button onclick="loadSample('resume')" class="text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">Sample</button>
                         <button onclick="clearInput('resumeText')" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
                     </div>
                 </div>
-                <textarea id="resumeText" class="flex-grow w-full bg-transparent p-5 resize-none focus:outline-none text-sm font-mono leading-relaxed text-gray-700 dark:text-gray-300" placeholder="// Paste your resume text here..."></textarea>
+                
+                <!-- Status Bar for Uploads -->
+                <div id="uploadStatus" class="hidden px-4 py-2 bg-blue-50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 text-xs text-blue-600 dark:text-blue-300 flex items-center justify-between">
+                    <span id="uploadFileName" class="truncate max-w-[80%]"><i class="fa-solid fa-spinner fa-spin mr-2"></i> Parsing file...</span>
+                    <button onclick="closeUploadStatus()" class="hover:text-blue-800"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <textarea id="resumeText" class="flex-grow w-full bg-transparent p-5 resize-none focus:outline-none text-sm font-mono leading-relaxed text-gray-700 dark:text-gray-300" placeholder="// Paste your resume text here, or click Upload..."></textarea>
             </div>
 
             <!-- JD Input Panel -->
@@ -175,7 +207,7 @@
                         <h2 class="font-heading font-semibold text-sm uppercase tracking-wider text-gray-500">Job Description</h2>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span id="jdWordCount" class="text-xs text-gray-400 font-mono">0 words</span>
+                        <span id="jdWordCount" class="text-xs text-gray-400 font-mono hidden sm:inline">0 words</span>
                         <button onclick="loadSample('jd')" class="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400">Load Sample</button>
                         <button onclick="clearInput('jdText')" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fa-solid fa-trash-can text-xs"></i></button>
                     </div>
@@ -340,6 +372,8 @@
         const resultsSection = document.getElementById('results');
         const errorMsg = document.getElementById('errorMsg');
         const apiStatus = document.getElementById('apiStatus');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const uploadFileName = document.getElementById('uploadFileName');
 
         // Word Count Listeners
         resumeInput.addEventListener('input', () => updateWordCount('resumeText', 'resumeWordCount'));
@@ -354,17 +388,95 @@
         function clearInput(id) {
             document.getElementById(id).value = '';
             updateWordCount(id, id === 'resumeText' ? 'resumeWordCount' : 'jdWordCount');
+            if (id === 'resumeText') closeUploadStatus();
         }
+
+        function closeUploadStatus() {
+            uploadStatus.classList.add('hidden');
+            document.getElementById('resumeFileUpload').value = ''; // Reset file input
+        }
+
+        // --- File Upload Logic ---
+
+        async function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            // Show loading status
+            uploadStatus.classList.remove('hidden');
+            uploadFileName.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Parsing ${file.name}...`;
+            
+            try {
+                let text = '';
+                const fileType = file.name.split('.').pop().toLowerCase();
+
+                if (fileType === 'pdf') {
+                    text = await parsePDF(file);
+                } else if (fileType === 'docx') {
+                    text = await parseDOCX(file);
+                } else if (fileType === 'txt') {
+                    text = await parseTXT(file);
+                } else {
+                    throw new Error("Unsupported file type");
+                }
+
+                // Update UI with extracted text
+                resumeInput.value = text;
+                updateWordCount('resumeText', 'resumeWordCount');
+                
+                // Show success status
+                uploadFileName.innerHTML = `<i class="fa-solid fa-check-circle text-green-500 mr-2"></i> Loaded: ${file.name}`;
+                
+            } catch (err) {
+                console.error(err);
+                uploadFileName.innerHTML = `<i class="fa-solid fa-circle-exclamation text-red-500 mr-2"></i> Error: ${err.message}`;
+            }
+        }
+
+        async function parseTXT(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsText(file);
+            });
+        }
+
+        async function parsePDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument(arrayBuffer);
+            const pdf = await loadingTask.promise;
+            
+            let fullText = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
+            }
+            return fullText;
+        }
+
+        async function parseDOCX(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+            return result.value;
+        }
+
+        // --- Sample Data Logic ---
 
         function loadSample(type) {
             if (type === 'resume') {
                 resumeInput.value = `John Doe\nSoftware Engineer\nEmail: john@example.com | Phone: (555) 123-4567\n\nSummary\nExperienced Frontend Developer with 5 years of experience in building responsive web applications using React and TypeScript. Passionate about clean code and UI/UX design.\n\nExperience\nSenior Developer | TechCorp | 2020 - Present\n- Led a team of 4 developers to build a SaaS dashboard using React, Redux, and Tailwind CSS.\n- Optimized application performance, reducing load time by 40%.\n- Implemented CI/CD pipelines using GitHub Actions.\n\nSkills\n- Languages: JavaScript, TypeScript, HTML, CSS, Python\n- Frameworks: React, Next.js, Vue.js\n- Tools: Git, Docker, AWS, Jira`;
+                closeUploadStatus();
             } else {
                 jdInput.value = `Job Title: Senior Frontend Engineer\n\nWe are looking for a skilled Frontend Engineer to join our team.\n\nResponsibilities:\n- Develop modern user interfaces using React and TypeScript.\n- Collaborate with designers to implement responsive designs with Tailwind CSS.\n- Optimize applications for maximum speed and scalability.\n- participate in code reviews and mentor junior developers.\n\nRequirements:\n- 3+ years of experience with modern JavaScript frameworks (React preferred).\n- Strong proficiency in TypeScript, HTML5, and CSS3.\n- Experience with state management (Redux, Context API).\n- Familiarity with agile methodologies and tools like Jira.\n- Knowledge of AWS and CI/CD is a plus.\n- Excellent communication skills.`;
             }
             updateWordCount('resumeText', 'resumeWordCount');
             updateWordCount('jdText', 'jdWordCount');
         }
+
+        // --- Analysis Logic ---
 
         async function analyzeResume() {
             const resumeText = resumeInput.value.trim();
